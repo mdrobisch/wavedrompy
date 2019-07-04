@@ -28,10 +28,12 @@
 import sys
 import json
 import math
-from . import waveskin, css
+import waveskin, css
 import argparse
 from attrdict import AttrDict
 import svgwrite
+from cairosvg import svg2png
+from io import StringIO
 
 
 class WaveDrom(object):
@@ -952,7 +954,7 @@ class WaveDrom(object):
 
         parent.extend(e)
 
-    def renderWaveForm(self, index=0, source={}, output=[]):
+    def renderWaveForm(self, index=0, source={}, output=[],background=None):
         """
         index = 0
         source = {}
@@ -1000,7 +1002,8 @@ class WaveDrom(object):
             dy = float(self.lane.yh0) + float(self.lane.yh1)
             lanes.translate(dx, dy)
             # output[-1][2][1]["transform"] = "translate({dx},{dy})".format(dx=dx, dy=dy)
-
+            if background is not None:
+                template.add(svgwrite.shapes.Rect(insert=(int(0), int(0)), size=(width, height), style="fill:"+ str(background) + ";"))
             waves.add(lanes)
             waves.add(groups)
             template.add(waves)
@@ -1170,14 +1173,13 @@ def main(args=None):
     if not args:
         parser = argparse.ArgumentParser(description="")
         parser.add_argument("--input", "-i", help="<input wavedrom source filename>")
-        # parser.add_argument("--png", "-p", help="<output PNG image file name>")
-        # parser.add_argument("--pdf", "-P", help="<output PDF file name>")
-        parser.add_argument("--svg", "-s", help="<output SVG image file name>")
+        parser.add_argument("--background", "-b", action='store_true', help="<input wavedrom source filename>")
+        parser.add_argument("--output", "-o", help="<output SVG image file name>")
         args = parser.parse_args()
 
     output = []
     inputfile = args.input
-    outputfile = args.svg
+    outputfile = args.output
 
     wavedrom = WaveDrom()
     if not inputfile or not outputfile:
@@ -1186,14 +1188,20 @@ def main(args=None):
         with open(inputfile, "r") as f:
             jinput = json.load(f)
 
-        output = wavedrom.renderWaveForm(0, jinput)
-        # wavedrom.renderWaveForm(0, jinput, output)
+        background = None
+        if args.background is True:
+            background="#FFF"
 
+        output = wavedrom.renderWaveForm(0, jinput, background=background)
+        # wavedrom.renderWaveForm(0, jinput, output)
         # svg_output = wavedrom.convert_to_svg(output)
         # with open(outputfile, "w") as f:
         #     f.write(svg_output)
-        output.saveas(outputfile)
-
+        output.saveas(outputfile + '.svg')
+        outputstring = StringIO()
+        output.write(outputstring)
+        svg2png(bytestring=outputstring.getvalue(),write_to=outputfile + '.png')
+        outputstring.close()
 
 if __name__ == "__main__":
     main()
